@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StoryToFB Finder - Tìm bài viết Facebook từ link truyện</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <!-- Toast -->
+  <div id="toast" class="fixed top-6 right-6 z-50 -translate-y-[150%] opacity-0 transition-all duration-300 flex items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+    <span id="toast-message" class="text-sm font-medium"></span>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white">
+          <i class="fa-brands fa-facebook-f text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">StoryToFB Finder</h1>
+          <p class="text-xs text-slate-500">Tìm bài viết Facebook xếp hạng cao trên Google trùng khớp với nội dung truyện</p>
+        </div>
+      </div>
+      <button id="btn-settings" type="button" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition">
+        <span id="provider-dot" class="w-2 h-2 rounded-full"></span>
+        <span id="provider-label">Đang kiểm tra...</span>
+        <i class="fa-solid fa-gear text-slate-400"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+    <!-- Settings -->
+    <div id="settings-card" class="hidden card p-6 space-y-4 border-indigo-200">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2"><i class="fa-solid fa-key text-indigo-600"></i> Cấu hình API tìm kiếm Google</h3>
+          <p class="text-xs text-slate-500 mt-1 max-w-3xl">
+            Tool dùng API chính thức để lấy kết quả Google (đúng thứ tự như khi bạn tự tìm trên google.com).
+            Khuyên dùng <b>Serper.dev</b>: đăng ký tại <a href="https://serper.dev" target="_blank" class="text-indigo-600 underline">serper.dev</a>, có 2.500 lượt tìm miễn phí, copy API key dán vào đây.
+          </p>
+        </div>
+        <button id="btn-settings-close" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="grid sm:grid-cols-[200px_1fr] gap-3">
+        <select id="cfg-provider" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm">
+          <option value="serper">Serper.dev (khuyên dùng)</option>
+          <option value="serpapi">SerpAPI</option>
+          <option value="google_cse">Google Custom Search</option>
+        </select>
+        <input id="cfg-key" type="password" placeholder="Dán API key vào đây" class="bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-mono-code">
+      </div>
+      <input id="cfg-cx" type="text" placeholder="Search engine ID (CX) — chỉ cần cho Google Custom Search" class="hidden w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-mono-code">
+      <div class="flex justify-end">
+        <button id="btn-save-config" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl">
+          <i class="fa-solid fa-floppy-disk mr-1"></i> Lưu cấu hình
+        </button>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="card p-6 sm:p-7 space-y-3">
+      <label for="story-input" class="text-sm font-bold text-slate-800 flex items-center justify-between">
+        <span class="flex items-center gap-2"><i class="fa-solid fa-link text-indigo-600"></i> Nhập link truyện:</span>
+        <button id="btn-example" type="button" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+          <i class="fa-regular fa-lightbulb"></i> Dán link mẫu
+        </button>
+      </label>
+      <div class="relative flex items-center">
+        <input type="text" id="story-input"
+          placeholder="Ví dụ: https://doctruyen.giangsonnhuhoa.com/truyen/ttty-3507-ly-hon-toi-thu-hoi-the-den/"
+          class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3.5 pr-32 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
+        <div class="absolute right-2.5 flex items-center gap-1">
+          <button id="btn-clear" type="button" class="hidden text-slate-400 hover:text-slate-600 p-2"><i class="fa-solid fa-xmark"></i></button>
+          <button id="btn-search" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-magnifying-glass"></i><span>Tìm kiếm</span>
+          </button>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500"><i class="fa-solid fa-circle-info text-slate-400"></i>
+        Tool lấy đoạn mở đầu truyện, tìm trên Google giống như bạn copy đoạn đó dán vào google.com, rồi chọn bài Facebook xếp cao nhất có nội dung khớp truyện.
+      </p>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading-card" class="hidden card p-8 text-center space-y-3">
+      <div class="inline-flex w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 items-center justify-center animate-spin"><i class="fa-solid fa-circle-notch text-xl"></i></div>
+      <h3 id="loading-status" class="text-base font-bold text-slate-800">Đang xử lý...</h3>
+      <p class="text-xs text-slate-500">Thường mất 10–30 giây.</p>
+    </div>
+
+    <!-- Error -->
+    <div id="error-card" class="hidden rounded-2xl bg-rose-50 border border-rose-200 p-5 flex items-start gap-4">
+      <i class="fa-solid fa-triangle-exclamation text-rose-600 text-lg mt-0.5"></i>
+      <div class="flex-1">
+        <h4 class="text-sm font-bold text-rose-900">Không thể hoàn thành</h4>
+        <p id="error-message" class="text-xs text-rose-700 mt-1"></p>
+      </div>
+      <button onclick="document.getElementById('error-card').classList.add('hidden')" class="text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Story info -->
+    <div id="story-card" class="hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 space-y-2">
+      <div class="flex items-center gap-2">
+        <span id="res-story-code" class="text-[11px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-md"></span>
+        <span class="text-xs text-slate-300">Truyện gốc</span>
+      </div>
+      <h2 id="res-story-title" class="text-lg font-bold"></h2>
+      <p id="res-story-intro" class="text-xs text-slate-300 line-clamp-2"></p>
+      <div class="pt-2 flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-slate-400">Truy vấn Google:</span>
+        <code id="res-query" class="bg-white/10 px-2 py-1 rounded text-indigo-100 max-w-full truncate"></code>
+        <a id="res-google-link" href="#" target="_blank" class="text-indigo-300 hover:text-white underline whitespace-nowrap"><i class="fa-brands fa-google"></i> Xem trên Google</a>
+      </div>
+    </div>
+
+    <!-- Manual mode (chưa có API key) -->
+    <div id="manual-card" class="hidden card p-6 space-y-4 border-amber-200 bg-amber-50/40">
+      <div>
+        <h3 class="text-sm font-bold text-amber-900 flex items-center gap-2"><i class="fa-solid fa-hand-pointer"></i> Chưa có API key — tìm thủ công (2 bước)</h3>
+        <p class="text-xs text-amber-800 mt-1">Để tool tự tìm, bấm nút cấu hình ở góc trên bên phải và dán API key. Trong lúc chờ, bạn có thể làm như sau:</p>
+      </div>
+      <ol class="text-sm space-y-3">
+        <li class="flex flex-wrap items-center gap-2">
+          <b>1.</b> <a id="manual-google" href="#" target="_blank" class="bg-white border border-slate-300 hover:border-indigo-400 px-3 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-brands fa-google text-blue-600"></i> Mở Google với đoạn mở đầu truyện</a>
+          <span class="text-xs text-slate-500">→ copy link bài Facebook đầu tiên</span>
+        </li>
+        <li class="flex flex-col sm:flex-row gap-2">
+          <span class="pt-2"><b>2.</b></span>
+          <input id="manual-fb" type="text" placeholder="Dán link bài Facebook vào đây" class="flex-1 bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-mono-code">
+          <button id="btn-manual-extract" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl whitespace-nowrap">Lấy nội dung</button>
+        </li>
+      </ol>
+    </div>
+
+    <!-- Results: 2 ô chính -->
+    <div id="result-section" class="hidden space-y-6">
+
+      <div id="warning-card" class="hidden rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 flex gap-2">
+        <i class="fa-solid fa-triangle-exclamation mt-0.5"></i><span id="warning-text"></span>
+      </div>
+
+      <!-- Ô 1 -->
+      <div class="card p-6 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="min-w-0">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <span class="w-6 h-6 rounded-md bg-blue-100 text-blue-600 inline-flex items-center justify-center text-xs">1</span>
+              <i class="fa-brands fa-facebook text-blue-600"></i> Link bài viết Facebook
+            </h3>
+            <div class="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+              <span id="res-rank" class="hidden font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded"></span>
+              <span id="res-match" class="hidden font-semibold px-2 py-0.5 rounded"></span>
+              <span id="res-fb-title" class="truncate max-w-xl"></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <a id="btn-open-fb" href="#" target="_blank" class="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Facebook
+            </a>
+            <button id="btn-copy-link" type="button" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl">
+              <i class="fa-regular fa-copy"></i> <span>Sao chép link</span>
+            </button>
+          </div>
+        </div>
+        <input type="text" id="box-fb-url" readonly class="w-full bg-slate-50 border border-slate-300 font-mono-code text-xs text-blue-600 px-4 py-3 rounded-xl">
+      </div>
+
+      <!-- Ô 2 -->
+      <div class="card p-6 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <span class="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 inline-flex items-center justify-center text-xs">2</span>
+              <i class="fa-solid fa-align-left text-indigo-600"></i> Nội dung bài đăng Facebook
+            </h3>
+            <p class="text-xs text-slate-500 mt-1"><span id="res-char-count">0</span> ký tự • <span id="res-word-count">0</span> từ</p>
+          </div>
+          <button id="btn-copy-content" type="button" class="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl">
+            <i class="fa-regular fa-copy"></i> <span>Sao chép tất cả nội dung</span>
+          </button>
+        </div>
+        <textarea id="box-fb-content" rows="16" readonly class="w-full bg-slate-50 border border-slate-300 rounded-xl p-4 text-sm leading-relaxed resize-y"></textarea>
+      </div>
+
+      <!-- Bài khác -->
+      <div id="other-card" class="hidden card p-6 space-y-3">
+        <h4 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-list text-slate-500"></i> Các bài Facebook khác Google trả về</h4>
+        <div id="other-list" class="space-y-2"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">StoryToFB Finder</footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const API_BASE = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://127.0.0.1:8765';
+    const EXAMPLE_URL = "https://doctruyen.giangsonnhuhoa.com/truyen/ttty-3507-ly-hon-toi-thu-hoi-the-den/";
+    const PROVIDER_NAMES = { serper: "Serper.dev", serpapi: "SerpAPI", google_cse: "Google CSE" };
+    let currentStoryText = "";
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function showToast(msg, ok = true) {
+      $('toast-message').textContent = msg;
+      $('toast-icon').className = ok ? "fa-solid fa-circle-check text-emerald-400 text-lg" : "fa-solid fa-circle-exclamation text-amber-400 text-lg";
+      $('toast').classList.remove('-translate-y-[150%]', 'opacity-0');
+      setTimeout(() => $('toast').classList.add('-translate-y-[150%]', 'opacity-0'), 2500);
+    }
+
+    async function callApi(path, payload, method = 'POST') {
+      let res;
+      try {
+        res = await fetch(API_BASE + path, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: method === 'GET' ? undefined : JSON.stringify(payload || {})
+        });
+      } catch (e) {
+        throw new Error("Không kết nối được server. Hãy chạy start.bat rồi mở http://127.0.0.1:8765");
+      }
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error(data.detail || `Lỗi server (${res.status}).`);
+      return data;
+    }
+
+    async function copyText(text, label) {
+      if (!text) return showToast("Không có nội dung để sao chép!", false);
+      try { await navigator.clipboard.writeText(text); }
+      catch (e) {
+        const t = document.createElement("textarea");
+        t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+      }
+      showToast(label);
+    }
+
+    // ---- Cấu hình API ----
+    function renderProvider(provider) {
+      const btn = $('btn-settings');
+      if (provider) {
+        $('provider-label').textContent = `Google API: ${PROVIDER_NAMES[provider] || provider}`;
+        $('provider-dot').className = "w-2 h-2 rounded-full bg-emerald-500";
+        btn.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200";
+      } else {
+        $('provider-label').textContent = "Chưa có API key";
+        $('provider-dot').className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+        btn.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200";
+      }
+    }
+    async function loadConfig() {
+      try { renderProvider((await callApi('/api/config', null, 'GET')).provider); }
+      catch (e) { $('provider-label').textContent = "Server chưa chạy"; }
+    }
+    $('btn-settings').onclick = () => $('settings-card').classList.toggle('hidden');
+    $('btn-settings-close').onclick = () => $('settings-card').classList.add('hidden');
+    $('cfg-provider').onchange = () => $('cfg-cx').classList.toggle('hidden', $('cfg-provider').value !== 'google_cse');
+    $('btn-save-config').onclick = async () => {
+      try {
+        const d = await callApi('/api/config', { provider: $('cfg-provider').value, api_key: $('cfg-key').value, cx: $('cfg-cx').value });
+        renderProvider(d.provider);
+        $('settings-card').classList.add('hidden');
+        $('cfg-key').value = "";
+        showToast("Đã lưu API key!");
+      } catch (e) { showToast(e.message, false); }
+    };
+
+    // ---- Tìm kiếm ----
+    $('story-input').addEventListener('input', () => $('btn-clear').classList.toggle('hidden', !$('story-input').value.trim()));
+    $('story-input').addEventListener('keydown', e => { if (e.key === 'Enter') performSearch(); });
+    $('btn-clear').onclick = () => { $('story-input').value = ''; $('btn-clear').classList.add('hidden'); };
+    $('btn-example').onclick = () => { $('story-input').value = EXAMPLE_URL; $('btn-clear').classList.remove('hidden'); performSearch(); };
+    $('btn-search').onclick = performSearch;
+    $('btn-copy-link').onclick = () => copyText($('box-fb-url').value, "Đã sao chép link Facebook!");
+    $('btn-copy-content').onclick = () => copyText($('box-fb-content').value, "Đã sao chép toàn bộ nội dung!");
+
+    function setLoading(on, text) {
+      $('loading-card').classList.toggle('hidden', !on);
+      if (text) $('loading-status').textContent = text;
+      $('btn-search').disabled = on;
+      $('btn-search').classList.toggle('opacity-50', on);
+    }
+
+    async function performSearch() {
+      const input = $('story-input').value.trim();
+      if (!input) return showToast("Vui lòng nhập link truyện!", false);
+      ['error-card', 'result-section', 'story-card', 'manual-card'].forEach(id => $(id).classList.add('hidden'));
+      setLoading(true, "Đang đọc truyện và tìm trên Google...");
+      try {
+        const data = await callApi('/api/search', { input });
+        renderStory(data);
+        if (data.needs_config) {
+          $('manual-google').href = data.google_url;
+          $('manual-fb').value = "";
+          $('manual-card').classList.remove('hidden');
+          renderProvider(null);
+        } else {
+          renderResult(data);
+        }
+      } catch (e) {
+        $('error-message').textContent = e.message;
+        $('error-card').classList.remove('hidden');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderStory(d) {
+      currentStoryText = d.story_text || "";
+      $('res-story-code').textContent = d.story_code ? `Mã: ${d.story_code}` : "Truyện";
+      $('res-story-title').textContent = d.story_title || "";
+      $('res-story-intro').textContent = d.intro_preview || "";
+      $('res-query').textContent = d.query || "";
+      $('res-query').title = d.query || "";
+      $('res-google-link').href = d.google_url || "#";
+      $('story-card').classList.toggle('hidden', !d.story_title);
+    }
+
+    function fillBoxes(link, content, chars, words) {
+      $('box-fb-url').value = link || "";
+      $('btn-open-fb').href = link || "#";
+      $('box-fb-content').value = content || "";
+      $('res-char-count').textContent = (chars || 0).toLocaleString('vi-VN');
+      $('res-word-count').textContent = (words || 0).toLocaleString('vi-VN');
+    }
+
+    function renderResult(d) {
+      fillBoxes(d.fb_link, d.fb_content, d.char_count, d.word_count);
+      $('res-fb-title').textContent = d.fb_title || "";
+
+      $('res-rank').classList.toggle('hidden', !d.rank);
+      $('res-rank').textContent = d.rank ? `Hạng #${d.rank} trên Google` : "";
+
+      const m = d.match_score;
+      $('res-match').classList.toggle('hidden', m == null);
+      if (m != null) {
+        const good = m >= 0.3;
+        $('res-match').textContent = `Khớp truyện ${Math.round(m * 100)}%`;
+        $('res-match').className = `font-semibold px-2 py-0.5 rounded ${good ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`;
+      }
+
+      $('warning-card').classList.toggle('hidden', !d.warning);
+      $('warning-text').textContent = d.warning || "";
+
+      const others = d.other_fb_links || [];
+      $('other-list').innerHTML = others.map((o, i) => `
+        <div class="p-3 rounded-xl border border-slate-200 hover:border-indigo-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-slate-800 truncate">
+              <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-1">Hạng #${o.rank}</span>
+              <span class="text-[10px] ${o.match >= 0.3 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'} px-1.5 py-0.5 rounded mr-1">Khớp ${Math.round(o.match * 100)}%</span>
+              ${escapeHtml(o.title)}
+            </p>
+            <p class="text-[11px] text-slate-500 truncate">${escapeHtml(o.snippet)}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a href="${escapeHtml(o.url)}" target="_blank" class="text-slate-400 hover:text-slate-700 p-1.5"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>
+            <button data-url="${escapeHtml(o.url)}" data-title="${escapeHtml(o.title)}" class="btn-use-other text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg">Dùng bài này</button>
+          </div>
+        </div>`).join("");
+      $('other-card').classList.toggle('hidden', others.length === 0);
+      document.querySelectorAll('.btn-use-other').forEach(b => b.onclick = () => extractInto(b.dataset.url, b.dataset.title));
+
+      $('result-section').classList.remove('hidden');
+      $('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function extractInto(fbUrl, title) {
+      setLoading(true, "Đang lấy nội dung bài Facebook...");
+      try {
+        const d = await callApi('/api/extract_content', { fb_url: fbUrl, story_text: currentStoryText });
+        fillBoxes(d.fb_link, d.content, d.char_count, d.word_count);
+        $('res-fb-title').textContent = title || "";
+        ['res-rank', 'res-match', 'warning-card'].forEach(id => $(id).classList.add('hidden'));
+        $('result-section').classList.remove('hidden');
+        $('box-fb-url').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast("Đã tải nội dung bài viết!");
+      } catch (e) {
+        showToast(e.message, false);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    $('btn-manual-extract').onclick = () => {
+      const url = $('manual-fb').value.trim();
+      if (!url.includes('facebook.com')) return showToast("Hãy dán link bài Facebook!", false);
+      $('other-card').classList.add('hidden');
+      extractInto(url, "");
+    };
+
+    loadConfig();
+  </script>
+</body>
+</html>
