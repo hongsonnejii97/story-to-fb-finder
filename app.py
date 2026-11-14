@@ -83,7 +83,7 @@ def search_endpoint(req: SearchRequest):
         raise HTTPException(400, "Vui lòng nhập link truyện hoặc tiêu đề.")
 
     # Dán thẳng link Facebook -> chỉ trích xuất nội dung
-    if "facebook.com" in user_input and user_input.startswith("http"):
+    if ("facebook.com" in user_input.lower() or "fb.watch" in user_input.lower()) and user_input.startswith("http"):
         fb = clean_facebook_url(user_input)
         ex = extract_facebook_content(fb)
         return {
@@ -189,7 +189,7 @@ def search_endpoint(req: SearchRequest):
 @app.post("/api/extract_content")
 def extract_content_endpoint(req: ExtractRequest):
     url = clean_facebook_url(req.fb_url.strip())
-    if not is_valid_facebook_post(url) and "facebook.com" not in url:
+    if not is_valid_facebook_post(url) and "facebook.com" not in url.lower() and "fb.watch" not in url.lower():
         raise HTTPException(400, "Link Facebook không hợp lệ.")
     ex = extract_facebook_content(url, req.story_text or "")
     ex["fb_link"] = url

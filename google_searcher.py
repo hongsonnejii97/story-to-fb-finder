@@ -7,6 +7,7 @@ Hỗ trợ 3 nhà cung cấp, chọn theo key có trong file .env:
   - Google Custom Search JSON API : GOOGLE_CSE_KEY + GOOGLE_CSE_CX
 """
 import os
+import re
 import urllib.parse
 import requests
 from dotenv import load_dotenv
@@ -94,20 +95,36 @@ def clean_facebook_url(url: str) -> str:
     """Chuẩn hoá link Facebook, bỏ tham số theo dõi (fbclid, __cft__...)."""
     if not url:
         return ""
-    parsed = urllib.parse.urlparse(url)
+    parsed = urllib.parse.urlparse(url.strip())
     qs = urllib.parse.parse_qs(parsed.query)
-    keep = {k: qs[k][0] for k in ["story_fbid", "fbid", "id", "v", "set"] if k in qs}
-    netloc = parsed.netloc.replace("m.facebook.com", "www.facebook.com").replace("web.facebook.com", "www.facebook.com")
-    return urllib.parse.urlunparse(("https", netloc, parsed.path, "", urllib.parse.urlencode(keep), "")).rstrip("/")
+    keep = {k: qs[k][0] for k in ["story_fbid", "fbid", "id", "v", "set", "multi_permalinks"] if k in qs}
+    netloc = (
+        parsed.netloc.lower()
+        .replace("m.facebook.com", "www.facebook.com")
+        .replace("web.facebook.com", "www.facebook.com")
+        .replace("mbasic.facebook.com", "www.facebook.com")
+        .replace("touch.facebook.com", "www.facebook.com")
+    )
+    if netloc == "facebook.com":
+        netloc = "www.facebook.com"
+    path = re.sub(r"\.php/+$", ".php", parsed.path)
+    if not keep:
+        path = path.rstrip("/")
+    return urllib.parse.urlunparse(("https", netloc, path, "", urllib.parse.urlencode(keep), ""))
 
 
 def is_valid_facebook_post(url: str) -> bool:
-    """Chỉ nhận link bài viết/ảnh/video, bỏ trang đăng nhập, tìm kiếm, hashtag..."""
-    if not url or "facebook.com" not in url:
+    """Chỉ nhận link bài viết/ảnh/video/reel/group/page/cá nhân, bỏ trang đăng nhập, tìm kiếm, hashtag..."""
+    if not url or ("facebook.com" not in url.lower() and "fb.watch" not in url.lower()):
         return False
     lower = url.lower()
+    if "fb.watch/" in lower:
+        return True
     if any(k in lower for k in ["/login", "/recover", "/hashtag/", "/search/", "/policies",
-                                 "/help/", "/terms", "/privacy", "/reg/"]):
+                                 "/help/", "/terms", "/privacy", "/reg/", "/events/", "/marketplace/"]):
         return False
-    return any(p in lower for p in ["/posts/", "/permalink.php", "/story.php", "/photos/", "/photo",
-                                    "/videos/", "/watch", "/reel/", "/share/", "story_fbid", "fbid="])
+    return any(p in lower for p in [
+        "/posts/", "/permalink/", "/permalink.php", "/story.php",
+        "/photos/", "/photo", "/videos/", "/watch", "/reel/", "/reels/",
+        "/share/", "/p/", "/notes/", "story_fbid", "fbid=", "multi_permalinks=",
+    ])
